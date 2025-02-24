@@ -3,7 +3,7 @@ format: html
 html-table-processing: none
 ---
 
-Get AI-focused stocks from Yahoo Finance
+Get AI-focused stocks from Yahoo Finance.
 
 ```{python}
 import polars as pl
@@ -86,7 +86,7 @@ def get_stock_data():
     return df
 ```
 
-First look at the table in the console.
+Obtain a fresh pull of the data and inspect the DataFrame.
 
 ```{python}
 df = get_stock_data()
@@ -100,4 +100,13 @@ from great_tables import GT
 
 GT(df)
 ```
+
+Issues:
+
+- order of columns is not ideal: `current_price` should go at the end; `market_cap_b` might go before the price information
+- the `focus` column seems out of place here
+- numbers need to be formatted
+- the column labels need to be presentable, right now they aren't great to read
+- it would be interesting to have a small plot showing price history in addition to the individual prices (to show the trend)
+- a spanner should be use to unify the columns of the price data
 
