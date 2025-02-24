@@ -253,5 +253,25 @@ gt_table = (
 gt_table
 ```
 
+While the `focus` column was omitted from the table, that information could be repurposed to fit nicely in the table footer. Here we extract that data from the DataFrame and create a single string. The `tab_source_note()` method lets us put that text into the table footer area.
+
+```{python}
+# Extract the focus data from the original DataFrame
+focus_data = df[['company', 'focus']]
+
+# Create a single string in the format "(company): (focus text); ..."
+focus_string = "; ".join([f"{row['company']}: {row['focus']}" for _, row in focus_data.iterrows()])
+
+# Add the focus string as a source note in the table
+gt_table = (
+    gt_table
+    .tab_source_note(
+        md(f"Focus areas for each company:<br> {focus_string}")
+    )
+)
+
+gt_table
+```
+
 
 
