@@ -3,7 +3,7 @@ format: html
 html-table-processing: none
 ---
 
-Get AI-focused stocks from Yahoo Finance.
+Define a function to pull price data on AI-focused stocks from Yahoo Finance.
 
 ```{python}
 import polars as pl
@@ -99,7 +99,7 @@ df = get_stock_data(target_date="2025-01-27")
 df
 ```
 
-First look at the table in Great Tables.
+Have a first look at the table in Great Tables.
 
 ```{python}
 from great_tables import GT
@@ -115,8 +115,7 @@ Issues:
 - it would be interesting to have a small plot showing price history in addition to the individual prices (to show the trend)
 - a spanner should be use to unify the columns of the price data
 
-
-Let's move the `current_price` column to the end (so the sequence is in order). Then we'll hide the `focus` column since it doesn't add much here.
+Let's hide the `focus` column since it doesn't add very much to the presentation here (and could potentially make the column quite wide).
 
 ```{python}
 
@@ -146,7 +145,7 @@ gt_table = (
 gt_table
 ```
 
-Add a spanner label called 'Price History' to better show which columns show stock prices.
+Add a spanner label called 'Price History' to better show which columns contain the stock prices.
 
 ```{python}
 
@@ -157,7 +156,6 @@ gt_table = (
 
 gt_table
 ```
-
 
 Modify the column labels (currently inherited from the column names) so that they read better.
 
@@ -182,7 +180,6 @@ gt_table = (
 
 gt_table
 ```
-
 
 Modify the column widths so that everything looks nicely proportioned.
 
@@ -209,16 +206,24 @@ gt_table = (
 gt_table
 ```
 
+Apply a preset theme to the table with `opt_stylize()`.
+
+```{python}
+gt_table = (
+    gt_table
+    .opt_stylize(style=1, color="green", add_row_striping=False)
+)
+
+gt_table
+```
+
+Highlight the last column in blue (with white text). This is done with `tab_style()`, with help from the `style` and `loc` modules (for style and location definition).
 
 ```{python}
 from great_tables import style, loc
 
 gt_table = (
     gt_table
-    .tab_style(
-        style=style.text(size="10px"),
-        locations=loc.column_labels(columns=cs.starts_with("price"))
-    )
     .tab_style(
         style=[
             style.fill(color="steelblue"),
@@ -231,7 +236,7 @@ gt_table = (
 gt_table
 ```
 
-
+Add an informative title and subtitle to convey the purpose of the table. This is done with the `tab_header()` method.
 
 ```{python}
 from great_tables import md
@@ -240,11 +245,13 @@ gt_table = (
     gt_table
     .tab_header(
         title=md("Impact of **DeepSeek-R1** on AI-focused Stocks"),
-        subtitle="The DeepSeek model was released on January 20, 2025 but "
-        "major price action on AI-focused stocks occurred days later on January 27."
+        subtitle=md("The DeepSeek model was released on January 20, 2025 but major price action on AI-focused stocks occurred days later on January 27 (highlighted in <span style='color: steelblue; weight: bold;'>blue</span>).")
     )
     .opt_align_table_header(align="left")
 )
 
 gt_table
 ```
+
+
+
