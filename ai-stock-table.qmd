@@ -1,0 +1,103 @@
+---
+format: html
+html-table-processing: none
+---
+
+Get AI-focused stocks from Yahoo Finance
+
+```{python}
+import polars as pl
+import pandas as pd
+import yfinance as yf
+from datetime import datetime, timedelta
+
+# Define tickers
+tickers = ['NVDA', 'MSFT', 'GOOGL', 'META', 'AMZN', 'AMD', 'PLTR', 'AI', 'PATH', 'SOUN']
+
+def get_stock_data():
+
+    # Get dates for the last 7 days
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=7)
+
+
+    data = {
+        'company': [],
+        'ticker': [],
+        'market_cap_b': [],
+        'focus': [],
+        'current_price': [],
+    }
+    
+    focus_dict = {
+        'NVDA': 'AI chips, GPU computing',
+        'MSFT': 'Cloud AI, machine learning',
+        'GOOGL': 'AI research, search, cloud',
+        'META': 'Social AI, metaverse',
+        'AMZN': 'AWS AI services',
+        'AMD': 'AI processors',
+        'PLTR': 'AI-powered analytics',
+        'AI': 'Enterprise AI software',
+        'PATH': 'AI automation',
+        'SOUN': 'Voice AI technology'
+    }
+    
+    # Initialize empty lists for each day's prices
+    price_dates = []
+    
+    for ticker in tickers:
+        # Get current info
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Get historical data
+        hist = stock.history(period="7d")
+        
+        # Store the dates if we haven't already
+        if not price_dates:
+            price_dates = hist.index.strftime('%Y-%m-%d').tolist()
+            for date in price_dates:
+                data[f'price_{date}'] = []
+        
+        # Store basic info
+        data['company'].append(info.get('longName', ticker))
+        data['ticker'].append(ticker)
+        data['current_price'].append(float(info.get('regularMarketPrice', 0)))
+        data['market_cap_b'].append(float(info.get('marketCap', 0)) / 1e9)
+        data['focus'].append(focus_dict[ticker])
+        
+        # Store prices for each day
+        for date in price_dates:
+            try:
+                # Get the price for this date from historical data
+                price = float(hist.loc[date, 'Close'])
+            except:
+                # If price not available, use the previous known price or 0
+                price = float(0)
+            data[f'price_{date}'].append(price)
+    
+    df = pd.DataFrame(data)
+    
+    # Sort the columns to ensure prices are in chronological order
+    price_cols = [col for col in df.columns if col.startswith('price_')]
+    other_cols = [col for col in df.columns if not col.startswith('price_')]
+    df = df[other_cols + sorted(price_cols)]
+    
+    return df
+```
+
+First look at the table in the console.
+
+```{python}
+df = get_stock_data()
+df
+```
+
+First look at the table in Great Tables.
+
+```{python}
+from great_tables import GT
+
+GT(df)
+```
+
