@@ -111,6 +111,8 @@ Issues:
 - a spanner should be use to unify the columns of the price data
 
 
+Let's move the `current_price` column to the end (so the sequence is in order). Then we'll hide the `focus` column since it doesn't add much here.
+
 ```{python}
 
 import polars as pl
@@ -127,6 +129,7 @@ gt_table = (
 gt_table
 ```
 
+Now, we should format those prices and the `market_cap_b` column. That can be done with `fmt_currency()`.
 
 ```{python}
 
@@ -140,3 +143,5 @@ gt_table = (
 
 gt_table
 ```
+
+
