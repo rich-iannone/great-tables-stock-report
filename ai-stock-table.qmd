@@ -110,3 +110,33 @@ Issues:
 - it would be interesting to have a small plot showing price history in addition to the individual prices (to show the trend)
 - a spanner should be use to unify the columns of the price data
 
+
+```{python}
+
+import polars as pl
+import polars.selectors as cs
+
+df_pl = pl.from_pandas(df)
+
+gt_table = (
+    GT(df_pl)
+    .cols_move_to_end(columns="current_price")
+    .cols_hide(columns="focus")
+)
+
+gt_table
+```
+
+
+```{python}
+
+df_pl = pl.from_pandas(df)
+
+gt_table = (
+    gt_table
+    .fmt_currency(columns=cs.matches("price"))
+    .fmt_currency(columns="market_cap_b", use_subunits=False, pattern="{x}B")
+)
+
+gt_table
+```
