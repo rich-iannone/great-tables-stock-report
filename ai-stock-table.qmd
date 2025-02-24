@@ -3,6 +3,8 @@ format: html
 html-table-processing: none
 ---
 
+## Stock Tables
+
 Define a function to pull price data on AI-focused stocks from Yahoo Finance.
 
 ```{python}
@@ -92,11 +94,79 @@ def get_stock_data(target_date=None):
     return df
 ```
 
+
+```{python}
+from great_tables import GT, md, style, loc, nanoplot_options
+import polars as pl
+import polars.selectors as cs
+
+df = get_stock_data(target_date="2025-01-27")
+
+price_cols = [col for col in df.columns if col.startswith('price_')]
+price_labels = {col: col.replace('price_', '') for col in price_cols}
+
+column_labels = {
+    'company': 'Company',
+    'ticker': 'Ticker',
+    'market_cap_b': 'Market Cap',
+    **price_labels
+}
+
+price_cols = [col for col in df.columns if col.startswith('price_')]
+price_widths = {col: "200px" for col in price_cols}
+
+column_widths = {
+    'company': "300px",
+    'ticker': "80px",
+    'market_cap_b': "100px",
+    **price_widths
+}
+
+focus_data = df[['company', 'focus']]
+focus_string = "; ".join([f"{row['company']}: {row['focus']}" for _, row in focus_data.iterrows()])
+
+pl_df = pl.from_pandas(df).with_columns(trend=pl.concat_list(cs.starts_with("price")))
+
+gt_tbl = ( 
+    GT(pl_df)
+    .cols_hide(columns="focus")
+    .fmt_currency(columns=cs.starts_with("price"))
+    .fmt_currency(columns="market_cap_b", use_subunits=False, pattern="{x}B")
+    .tab_spanner(label="Price History", columns=cs.starts_with("price"))
+    .cols_label(**column_labels)
+    .cols_width(**column_widths)
+    .opt_stylize(style=1, color="green", add_row_striping=False)
+    .tab_header(
+        title=md("Impact of **DeepSeek-R1** on AI-focused Stocks"),
+        subtitle=md("The DeepSeek model was released on January 20, 2025 but major price action on AI-focused stocks occurred days later on January 27 (highlighted in <span style='color: steelblue; weight: bold;'>blue</span>).")
+    )
+    .opt_align_table_header(align="left")
+    .tab_source_note(md(f"Focus areas for each company:<br> {focus_string}"))
+    .fmt_nanoplot(columns="trend", options=nanoplot_options(show_data_points=False))
+)
+
+gt_tbl
+```
+
+
+## Step-by-step
+
 Obtain a fresh pull of the data and inspect the DataFrame.
 
 ```{python}
+import polars as pl
+
 df = get_stock_data(target_date="2025-01-27")
-df
+
+pl_df = pl.from_pandas(df)
+```
+
+Concatenate all of the `price_*` columns to a new list column.
+
+```{python}
+import polars.selectors as cs
+
+pl_df = pl_df.with_columns(trend=pl.concat_list(cs.starts_with("price")))
 ```
 
 Have a first look at the table in Great Tables.
@@ -104,7 +174,7 @@ Have a first look at the table in Great Tables.
 ```{python}
 from great_tables import GT
 
-GT(df)
+GT(pl_df)
 ```
 
 Issues:
@@ -119,13 +189,9 @@ Let's hide the `focus` column since it doesn't add very much to the presentation
 
 ```{python}
 
-import polars as pl
-import polars.selectors as cs
-
-df_pl = pl.from_pandas(df)
 
 gt_table = (
-    GT(df_pl)
+    GT(pl_df)
     .cols_hide(columns="focus")
 )
 
@@ -217,25 +283,6 @@ gt_table = (
 gt_table
 ```
 
-Highlight the last column in blue (with white text). This is done with `tab_style()`, with help from the `style` and `loc` modules (for style and location definition).
-
-```{python}
-from great_tables import style, loc
-
-gt_table = (
-    gt_table
-    .tab_style(
-        style=[
-            style.fill(color="steelblue"),
-            style.text(color="white")
-        ],
-        locations=loc.body(columns=cs.last())
-    )
-)
-
-gt_table
-```
-
 Add an informative title and subtitle to convey the purpose of the table. This is done with the `tab_header()` method.
 
 ```{python}
@@ -272,6 +319,19 @@ gt_table = (
 
 gt_table
 ```
+
+
+```{python}
+from great_tables import nanoplot_options
+
+gt_table = (
+    gt_table
+    .fmt_nanoplot(columns="trend", options=nanoplot_options(show_data_points=False))
+)
+
+gt_table
+```
+
 
 
 
