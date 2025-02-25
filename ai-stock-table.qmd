@@ -7,91 +7,49 @@ html-table-processing: none
 
 Define a function to pull price data on AI-focused stocks from Yahoo Finance.
 
-```{python}
-import polars as pl
-import pandas as pd
-import yfinance as yf
-from datetime import datetime, timedelta
 
-# Define tickers
+```{python}
+import yfinance as yf
+import polars as pl
+
 tickers = ['NVDA', 'MSFT', 'GOOGL', 'META', 'AMZN', 'AMD', 'PLTR', 'AI', 'PATH', 'SOUN']
 
-def get_stock_data(target_date=None):
-    # Use the provided target date or default to today
-    if target_date is None:
-        end_date = datetime.now()
-    else:
-        end_date = datetime.strptime(target_date, '%Y-%m-%d')
-    
-    start_date = end_date - timedelta(days=7)
+# Get the stock prices for the selected `tickers`
+df_pd = yf.download(
+    tickers=tickers,
+    start="2025-01-20",
+    end="2025-01-29"
+).stack().reset_index()
 
-    data = {
-        'company': [],
-        'ticker': [],
-        'market_cap_b': [],
-        'focus': [],
-    }
-    
-    focus_dict = {
-        'NVDA': 'AI chips, GPU computing',
-        'MSFT': 'Cloud AI, machine learning',
-        'GOOGL': 'AI research, search, cloud',
-        'META': 'Social AI, metaverse',
-        'AMZN': 'AWS AI services',
-        'AMD': 'AI processors',
-        'PLTR': 'AI-powered analytics',
-        'AI': 'Enterprise AI software',
-        'PATH': 'AI automation',
-        'SOUN': 'Voice AI technology'
-    }
-    
-    # Initialize empty lists for each day's prices
-    price_dates = []
-    
-    for ticker in tickers:
-        # Get current info
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        # Get historical data
-        hist = stock.history(start=start_date, end=end_date)
-        
-        # Store the dates if we haven't already
-        if not price_dates:
-            price_dates = hist.index.strftime('%Y-%m-%d').tolist()
-            for date in price_dates:
-                data[f'price_{date}'] = []
-        
-        # Store basic info
-        data['company'].append(info.get('longName', ticker))
-        data['ticker'].append(ticker)
-        data['market_cap_b'].append(float(info.get('marketCap', 0)) / 1e9)
-        data['focus'].append(focus_dict[ticker])
-        
-        # Store prices for each day
-        for date in price_dates:
-            try:
-                # Get the price for this date from historical data
-                price = float(hist.loc[date, 'Close'])
-            except:
-                # If price not available, use the previous known price or 0
-                price = float(0)
-            data[f'price_{date}'].append(price)
-        
-        # Add current price with date
-        current_price_date = end_date.strftime('%Y-%m-%d')
-        if f'price_{current_price_date}' not in data:
-            data[f'price_{current_price_date}'] = []
-        data[f'price_{current_price_date}'].append(float(info.get('regularMarketPrice', 0)))
-    
-    df = pd.DataFrame(data)
-    
-    # Sort the columns to ensure prices are in chronological order
-    price_cols = [col for col in df.columns if col.startswith('price_')]
-    other_cols = [col for col in df.columns if not col.startswith('price_')]
-    df = df[other_cols + sorted(price_cols)]
-    
-    return df
+# Convert to Polars, select certain columns, and pivot
+df_pl = (
+    pl.from_pandas(df_pd)
+    .cast({"Date": pl.Date})
+    .select(["Date", "Ticker", "Close"])
+    .pivot(index="Ticker", on="Date", values="Close")
+)
+
+# Initialize a list to store the data for each ticker
+metadata = []
+
+# Loop through each ticker and get the required information
+for ticker in tickers:
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    metadata.append({
+        'Ticker': ticker,
+        'MarketCap': info.get('marketCap', None),
+        'ShortName': info.get('shortName', None),
+        'Industry': info.get('industry', None)
+    })
+
+# Convert the list of dictionaries to a Polars DataFrame
+metadata_pl = pl.DataFrame(metadata)
+
+# Join the DataFrames together
+joined_data = df_pl.join(metadata_pl, on="Ticker")
+
+joined_data
 ```
 
 
@@ -100,48 +58,35 @@ from great_tables import GT, md, style, loc, nanoplot_options
 import polars as pl
 import polars.selectors as cs
 
-df = get_stock_data(target_date="2025-01-27")
 
-price_cols = [col for col in df.columns if col.startswith('price_')]
-price_labels = {col: col.replace('price_', '') for col in price_cols}
+df = joined_data
 
-column_labels = {
-    'company': 'Company',
-    'ticker': 'Ticker',
-    'market_cap_b': 'Market Cap',
-    **price_labels
-}
-
-price_cols = [col for col in df.columns if col.startswith('price_')]
-price_widths = {col: "200px" for col in price_cols}
-
-column_widths = {
-    'company': "300px",
-    'ticker': "80px",
-    'market_cap_b': "100px",
-    **price_widths
-}
-
-focus_data = df[['company', 'focus']]
-focus_string = "; ".join([f"{row['company']}: {row['focus']}" for _, row in focus_data.iterrows()])
-
-pl_df = pl.from_pandas(df).with_columns(trend=pl.concat_list(cs.starts_with("price")))
+tbl_data = joined_data.with_columns(trend=pl.concat_list(cs.starts_with("2025")))
 
 gt_tbl = ( 
-    GT(pl_df)
-    .cols_hide(columns="focus")
-    .fmt_currency(columns=cs.starts_with("price"))
-    .fmt_currency(columns="market_cap_b", use_subunits=False, pattern="{x}B")
-    .tab_spanner(label="Price History", columns=cs.starts_with("price"))
-    .cols_label(**column_labels)
-    .cols_width(**column_widths)
+    GT(tbl_data)
+    .cols_move(columns=["ShortName", "MarketCap"], after="Ticker")
+    .cols_hide(columns="Industry")
+    .fmt_currency(columns=cs.starts_with("2025"))
+    .fmt_number(columns="MarketCap", n_sigfig=2, compact=True, pattern="${x}")
+    .tab_spanner(label="Price History", columns=cs.starts_with("2025"))
+    .cols_label(
+        ShortName="Company",
+        MarketCap="Market Cap"
+    )
     .opt_stylize(style=1, color="green", add_row_striping=False)
+    .tab_style(
+        style=[
+            style.fill(color="steelblue"),
+            style.text(color="white")
+        ],
+        locations=loc.body(columns="2025-01-27")
+    )
     .tab_header(
         title=md("Impact of **DeepSeek-R1** on AI-focused Stocks"),
-        subtitle=md("The DeepSeek model was released on January 20, 2025 but major price action on AI-focused stocks occurred days later on January 27 (highlighted in <span style='color: steelblue; weight: bold;'>blue</span>).")
+        subtitle=md("The DeepSeek model was released on January 20, 2025 but major downward price action on AI-focused stocks occurred days later on January 27 (highlighted in <span style='color: steelblue; weight: bold;'>blue</span>).")
     )
     .opt_align_table_header(align="left")
-    .tab_source_note(md(f"Focus areas for each company:<br> {focus_string}"))
     .fmt_nanoplot(columns="trend", options=nanoplot_options(show_data_points=False))
 )
 
